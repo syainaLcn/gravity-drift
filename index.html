@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GRAVITY DRIFT</title>
+    <style>
+        :root { --bg: #001219; --ball: #ffffff; --goal: #94d2bd; --wall: #ae2012; --pulse: rgba(148, 210, 189, 0.3); }
+        body { margin: 0; background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
+        canvas { background: rgba(255,255,255,0.03); border: 2px solid #005f73; border-radius: 8px; cursor: crosshair; }
+        .ui { position: absolute; top: 20px; text-align: center; pointer-events: none; }
+        #msg { font-size: 1.2rem; color: var(--goal); margin-top: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="ui">
+        <div id="level">LEVEL: 1</div>
+        <div id="msg">CLICK NEAR THE BALL TO PUSH IT</div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const levelDisplay = document.getElementById('level');
+
+        canvas.width = 400;
+        canvas.height = 600;
+
+        let ball = { x: 200, y: 500, vx: 0, vy: 0, r: 10 };
+        let goal = { x: 200, y: 50, r: 25 };
+        let obstacles = [];
+        let level = 1;
+        let particles = [];
+
+        function initLevel() {
+            ball.x = 200; ball.y = 520; ball.vx = 0; ball.vy = 0;
+            obstacles = [];
+            // Magdadagdag ng blocks base sa level
+            for(let i=0; i < level; i++) {
+                obstacles.push({
+                    x: Math.random() * 300 + 50,
+                    y: 150 + (i * 60),
+                    w: 80, h: 20,
+                    speed: level > 2 ? (Math.random() - 0.5) * 4 : 0
+                });
+            }
+        }
+
+        canvas.onmousedown = (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+
+            // Physics Push
+            const dx = ball.x - mx;
+            const dy = ball.y - my;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if(dist < 100) {
+                const force = (100 - dist) / 10;
+                ball.vx += (dx / dist) * force;
+                ball.vy += (dy / dist) * force;
+                createPulse(mx, my);
+            }
+        };
+
+        function createPulse(x, y) {
+            particles.push({ x, y, r: 10, opacity: 1 });
+        }
+
+        function update() {
+            // Gravity and Friction
+            ball.vy += 0.05; // Gentle gravity
+            ball.vx *= 0.99;
+            ball.vy *= 0.99;
+
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // Wall Collisions
+            if(ball.x < ball.r || ball.x > canvas.width - ball.r) ball.vx *= -0.7;
+            if(ball.y < ball.r || ball.y > canvas.height - ball.r) ball.vy *= -0.7;
+            ball.x = Math.max(ball.r, Math.min(canvas.width - ball.r, ball.x));
+            ball.y = Math.max(ball.r, Math.min(canvas.height - ball.r, ball.y));
+
+            // Obstacle Collision
+            obstacles.forEach(o => {
+                if(o.speed) {
+                    o.x += o.speed;
+                    if(o.x < 0 || o.x > canvas.width - o.w) o.speed *= -1;
+                }
+
+                if(ball.x > o.x && ball.x < o.x + o.w && ball.y > o.y && ball.y < o.y + o.h) {
+                    initLevel(); // Reset on hit
+                }
+            });
+
+            // Goal Check
+            const gdx = ball.x - goal.x;
+            const gdy = ball.y - goal.y;
+            if(Math.sqrt(gdx*gdx + gdy*gdy) < goal.r) {
+                level++;
+                levelDisplay.innerText = "LEVEL: " + level;
+                initLevel();
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Goal
+            ctx.beginPath();
+            ctx.arc(goal.x, goal.y, goal.r, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(148, 210, 189, 0.2)';
+            ctx.fill();
+            ctx.strokeStyle = '#94d2bd';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Draw Obstacles
+            ctx.fillStyle = '#ae2012';
+            obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.w, o.h));
+
+            // Draw Ball
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#ffffff';
+
+            // Draw Particles
+            particles.forEach((p, i) => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+                ctx.strokeStyle = `rgba(148, 210, 189, ${p.opacity})`;
+                ctx.stroke();
+                p.r += 2;
+                p.opacity -= 0.05;
+                if(p.opacity <= 0) particles.splice(i, 1);
+            });
+
+            update();
+            requestAnimationFrame(draw);
+        }
+
+        initLevel();
+        draw();
+    </script>
+</body>
+</html>
